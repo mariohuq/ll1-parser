@@ -313,14 +313,14 @@ struct Checker {
             stack.pop();
             size_t row = distance(gram.non_terms.begin(), gram.non_terms.find(stack_top));
             size_t col = distance(gram.terms.begin(), gram.terms.find(input[0]));
-            auto prod_num = gram.parse_table[row][col];
+            auto prod_nums = gram.parse_table[row][col];
 
-            if (prod_num.empty()) {
+            if (prod_nums.empty()) {
                 //cout<<"No production found in parse table\n";
                 return false;
             }
-            if (prod_num.size() == 1) {
-                auto [_, rhs] = gram[*prod_num.begin()];
+            if (prod_nums.size() == 1) {
+                auto [_, rhs] = gram[*prod_nums.begin()];
                 if (rhs[0] != EPSILON) {
                     for (auto ch = rhs.rbegin(); ch != rhs.rend(); ++ch) {
                         stack.push(*ch);
@@ -328,7 +328,7 @@ struct Checker {
                 }
                 continue;
             }
-            return std::any_of(prod_num.begin(), prod_num.end(), [this, &input, &stack](size_t num){
+            return std::any_of(prod_nums.begin(), prod_nums.end(), [this, input, stack](size_t num){
                 auto [_, rhs] = gram[num];
                 auto _st = stack;
                 if (rhs[0] != EPSILON) {
@@ -336,7 +336,7 @@ struct Checker {
                         _st.push(*ch);
                     }
                 }
-                return helper(std::move(input), std::move(_st));
+                return helper(input, std::move(_st));
             });
         }
         return true;
