@@ -17,6 +17,12 @@ using Production = std::pair<Nonterminal, std::string>;
 constexpr Terminal EPSILON = 'e';
 constexpr Terminal END_OF_INPUT = '$';
 
+const std::set<char> BRACES = {
+'(',')',
+'[',']',
+'{','}',
+'<','>' };
+
 enum CheckerResult {
     INPUT_INVALID = -1,
     ACCEPTED = 1,
@@ -53,6 +59,10 @@ struct Grammar {
         return !isupper(ch);
     }
 
+    static bool is_semantic(char ch) {
+        return BRACES.find(ch) != BRACES.end();
+    }
+
 private:
     void find_follow(TermSet &the_follows, Nonterminal x) const {
         // cout<<"Finding follow of "<<non_term<<"\n";
@@ -63,6 +73,9 @@ private:
             // finished when finding FOLLOW from this production is complete
             bool finished = false;
             for (++ch; ch != rhs.end(); ++ch) {
+                if (is_semantic(*ch)) {
+                    continue;
+                }
                 // If terminal, just append to FOLLOW
                 if (is_terminal(*ch)) {
                     the_follows[x].insert(*ch);
@@ -104,6 +117,9 @@ private:
             // cout<<"Processing production "<<lhs<<"->"<<rhs<<"\n";
             // Loop till a non-terminal or no ϵ found
             for (auto ch = rhs.begin(); ch != rhs.end(); ++ch) {
+                if (is_semantic(*ch)) {
+                    continue;
+                }
                 // If first char in production a terminal, add it to firsts list
                 if (is_terminal(*ch)) {
                     the_firsts[x].insert(*ch);
@@ -122,13 +138,18 @@ private:
                 }
                 auto ch_firsts_copy = ch_firsts;
                 // Remove ϵ from FIRST if not the last variable
-                if (ch + 1 != rhs.end()) {
+                if (!is_last(ch, rhs.end())) {
                     ch_firsts_copy.erase(EPSILON);
                 }
                 // Append firsts of that variable
                 the_firsts[x].insert(ch_firsts_copy.begin(), ch_firsts_copy.end());
             }
         }
+    }
+
+    template<typename It>
+    static bool is_last(It it, It end) {
+        return std::find_if_not(it, end, is_semantic) != end;
     }
 
     [[nodiscard]] TermSet compute_firsts() const {
@@ -168,7 +189,7 @@ private:
         std::set<Terminal> result;
         for (const auto &[_, rhs]: productions) {
             for (char ch: rhs) {
-                if (is_terminal(ch)) {
+                if (is_terminal(ch) && !is_semantic(ch)) {
                     result.insert(ch);
                 }
             }
@@ -188,6 +209,7 @@ private:
             std::set<char> next_list;
             bool finished = false;
             for (char c: rhs) {
+                if (is_semantic(c)) { continue; }
                 if (is_terminal(c)) {
                     if (c != EPSILON) {
                         next_list.insert(c);
@@ -295,54 +317,75 @@ struct Checker {
     explicit Checker(const Grammar &gram) : gram(gram) {
     }
 
-    bool helper(std::string input, std::stack<char> stack) {
+    std::pair<bool, std::string> helper(std::string input, std::stack<char> stack) {
+        std::string output;
         // cout<<"Processing input string\n";
         while (!stack.empty() && !input.empty()) {
-            // If stack top same as input string char remove it
+            if (Grammar::is_semantic(stack.top())) {
+                output.push_back(stack.top());
+                stack.pop();
+                continue;
+            }
 
+            // If stack top same as input string char remove it
             if (input[0] == stack.top()) {
+                if (input[0] != END_OF_INPUT) {
+                    output.push_back(input[0]);
+                }
                 stack.pop();
                 input.erase(0, 1);
                 continue;
             }
             if (Grammar::is_terminal(stack.top())) {
                 //cout<<"Unmatched terminal found\n";
-                return false;
+                return {false, {}};
             }
-            char stack_top = stack.top();
+            Nonterminal stack_top = stack.top();
             stack.pop();
+            output.push_back(stack_top);
             size_t row = distance(gram.non_terms.begin(), gram.non_terms.find(stack_top));
             size_t col = distance(gram.terms.begin(), gram.terms.find(input[0]));
             auto prod_nums = gram.parse_table[row][col];
 
             if (prod_nums.empty()) {
                 //cout<<"No production found in parse table\n";
-                return false;
+                return {false, {}};
             }
             if (prod_nums.size() == 1) {
                 auto [_, rhs] = gram[*prod_nums.begin()];
-                if (rhs[0] != EPSILON) {
+                if (rhs[1] != EPSILON) {
                     for (auto ch = rhs.rbegin(); ch != rhs.rend(); ++ch) {
                         stack.push(*ch);
                     }
+                } else {
+                    stack.push(rhs[2]);
+                    stack.push(rhs[0]);
                 }
                 continue;
             }
-            return std::any_of(prod_nums.begin(), prod_nums.end(), [this, input, stack](size_t num){
+
+            for (size_t num: prod_nums) {
                 auto [_, rhs] = gram[num];
                 auto _st = stack;
-                if (rhs[0] != EPSILON) {
+                if (rhs[1] != EPSILON) {
                     for (auto ch = rhs.rbegin(); ch != rhs.rend(); ++ch) {
                         _st.push(*ch);
                     }
+                } else {
+                    _st.push(rhs[2]);
+                    _st.push(rhs[0]);
                 }
-                return helper(input, std::move(_st));
-            });
+                auto [acc, out] = helper(input, std::move(_st));
+                if (acc) {
+                    return {true, output + out};
+                }
+            }
+            return {false, {}};
         }
-        return true;
+        return {true, output};
     }
 
-    static CheckerResult is_accepted(std::string input,
+    static std::pair<CheckerResult, std::string> is_accepted(std::string input,
                                      const Grammar &gram) {
         input.push_back(END_OF_INPUT);
         std::stack<char> stack;
@@ -352,22 +395,27 @@ struct Checker {
         // Check if input string is valid
         for (char c: input) {
             if (gram.terms.find(c) == gram.terms.end()) {
-                return INPUT_INVALID;
+                return {INPUT_INVALID, {}};
             }
         }
 
-        return Checker{gram}.helper(input, stack) ? ACCEPTED : REJECTED;
+        auto [acc, out] = Checker{gram}.helper(input, stack);
+        if (acc) {
+            return {ACCEPTED, out};
+        } else {
+            return {REJECTED, {}};
+        }
     }
 };
 
-void verdict(const std::string &str, CheckerResult accepted) {
+void verdict(const std::string &str, const std::pair<CheckerResult, std::string>& accepted) {
     std::cout << '[' << str << "] ";
-    switch (accepted) {
+    switch (accepted.first) {
         case INPUT_INVALID:
             std::cout << "has unknown symbols";
             break;
         case ACCEPTED:
-            std::cout << "accepted";
+            std::cout << "accepted. Output: " << accepted.second;
             break;
         case REJECTED:
             std::cout << "rejected";
@@ -398,8 +446,7 @@ int main(int argc, char const *argv[]) {
         std::string str;
         std::getline(rights, str);
         if (str.empty()) { continue; }
-        auto accepted = Checker::is_accepted(str, gram);
-        verdict(str, accepted);
+        verdict(str, Checker::is_accepted(str, gram));
     }
     cout << "Press Ctrl+D to finish\n";
     while (true) {
@@ -408,8 +455,7 @@ int main(int argc, char const *argv[]) {
         if (!std::getline(std::cin, str)) {
             break;
         }
-        auto accepted = Checker::is_accepted(str, gram);
-        verdict(str, accepted);
+        verdict(str, Checker::is_accepted(str, gram));
     }
     return EXIT_SUCCESS;
 }

@@ -1,8 +1,8 @@
-S->aB
-S->bA
-A->aT
-A->baA
-B->bT
-B->aBB
-T->e
-T->S
+S->(aB)
+S->(bA)
+A->[aT]
+A->[baA]
+B->{bT}
+B->{aBB}
+T-><e>
+T-><S>
