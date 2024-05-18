@@ -54,95 +54,80 @@ struct Grammar {
     }
 
 private:
-    void find_follow(TermSet &the_follows, Nonterminal non_term) const {
-
+    void find_follow(TermSet &the_follows, Nonterminal x) const {
         // cout<<"Finding follow of "<<non_term<<"\n";
-
         for (const auto &[lhs, rhs]: productions) {
-            // finished when finding FOLLOW from this production is complete
-            bool finished = true;
-            auto ch = rhs.begin();
-
             // Skip variables till read non-terminal
-            //ch = std::find(ch, rhs.end(), non_term);
-            for (; ch != rhs.end(); ++ch) {
-                if (*ch == non_term) {
-                    finished = false;
-                    break;
-                }
-            }
-            ++ch;
-            for (; ch != rhs.end() && !finished; ++ch) {
+            auto ch = std::find(rhs.begin(), rhs.end(), x);
+            if (ch == rhs.end()) { continue; }
+            // finished when finding FOLLOW from this production is complete
+            bool finished = false;
+            for (++ch; ch != rhs.end(); ++ch) {
                 // If terminal, just append to FOLLOW
                 if (is_terminal(*ch)) {
-                    the_follows[non_term].insert(*ch);
+                    the_follows[x].insert(*ch);
                     finished = true;
                     break;
                 }
 
-                auto firsts_copy = firsts.at(*ch);
+                const auto& ch_firsts = firsts.at(*ch);
                 // If char's FIRSTs don't have ϵ FOLLOW search is over
-                if (firsts_copy.find(EPSILON) == firsts_copy.end()) {
-                    the_follows[non_term].insert(firsts_copy.begin(), firsts_copy.end());
+                if (ch_firsts.find(EPSILON) == ch_firsts.end()) {
+                    the_follows[x].insert(ch_firsts.begin(), ch_firsts.end());
                     finished = true;
                     break;
                 }
                 // Else next char has to be checked after appending FIRSTs to FOLLOW
-                firsts_copy.erase(EPSILON);
-                the_follows[non_term].insert(firsts_copy.begin(), firsts_copy.end());
+                auto ch_firsts_copy = ch_firsts;
+                ch_firsts_copy.erase(EPSILON);
+                the_follows[x].insert(ch_firsts_copy.begin(), ch_firsts_copy.end());
             }
-
-            // If end of production reached, FOLLOW is same as FOLLOW of variable
-            if (ch == rhs.end() && !finished) {
+            if (finished) { continue; }
+            // If end of production reached, FOLLOW ⊃ FOLLOW of lhs
+            if (ch == rhs.end()) {
                 // Find FOLLOW if it doesn't have
                 if (the_follows[lhs].empty()) {
                     find_follow(the_follows, lhs);
                 }
-                the_follows[non_term].insert(the_follows[lhs].begin(), the_follows[lhs].end());
+                the_follows[x].insert(the_follows[lhs].begin(), the_follows[lhs].end());
             }
         }
     }
 
-    void find_first(TermSet &the_firsts, Nonterminal non_term) const {
-
+    void find_first(TermSet &the_firsts, Nonterminal x) const {
         // cout<<"Finding firsts of "<<non_term<<"\n";
-
         for (const auto &[lhs, rhs]: productions) {
             // Find productions of the non-terminal
-            if (lhs != non_term) {
+            if (lhs != x) {
                 continue;
             }
             // cout<<"Processing production "<<lhs<<"->"<<rhs<<"\n";
-            // Loop till a non-terminal or no epsilon variable found
+            // Loop till a non-terminal or no ϵ found
             for (auto ch = rhs.begin(); ch != rhs.end(); ++ch) {
-                // If first char in production a non term, add it to firsts list
+                // If first char in production a terminal, add it to firsts list
                 if (is_terminal(*ch)) {
-                    the_firsts[non_term].insert(*ch);
+                    the_firsts[x].insert(*ch);
                     break;
-                } else {
-                    // If char in prod is non-terminal and whose firsts has no yet been found out
-                    // Find first for that non-terminal
-                    if (the_firsts[*ch].empty()) {
-                        find_first(the_firsts, *ch);
-                    }
-                    // If variable doesn't have epsilon, stop loop
-                    if (the_firsts[*ch].find(EPSILON) == the_firsts[*ch].end()) {
-                        the_firsts[non_term].insert(the_firsts[*ch].begin(), the_firsts[*ch].end());
-                        break;
-                    }
-
-                    auto firsts_copy = the_firsts[*ch];
-
-                    // Remove epsilon from firsts if not the last variable
-                    if (ch + 1 != rhs.end()) {
-                        firsts_copy.erase(EPSILON);
-                    }
-
-                    // Append firsts of that variable
-                    the_firsts[non_term].insert(firsts_copy.begin(), firsts_copy.end());
                 }
+                // If char in rhs is non-terminal and whose FIRST has not yet been found out
+                // Find FIRST for that non-terminal
+                const auto& ch_firsts = the_firsts[*ch];
+                if (ch_firsts.empty()) {
+                        find_first(the_firsts, *ch);
+                }
+                // If variable doesn't have ϵ, go to next production
+                if (ch_firsts.find(EPSILON) == ch_firsts.end()) {
+                    the_firsts[x].insert(ch_firsts.begin(), ch_firsts.end());
+                    break;
+                }
+                auto ch_firsts_copy = ch_firsts;
+                // Remove ϵ from FIRST if not the last variable
+                if (ch + 1 != rhs.end()) {
+                    ch_firsts_copy.erase(EPSILON);
+                }
+                // Append firsts of that variable
+                the_firsts[x].insert(ch_firsts_copy.begin(), ch_firsts_copy.end());
             }
-
         }
     }
 
@@ -188,7 +173,7 @@ private:
                 }
             }
         }
-        // Remove epsilon and add end character $
+        // Remove ϵ and add end character $
         result.erase(EPSILON);
         result.insert(END_OF_INPUT);
         return result;
@@ -202,17 +187,17 @@ private:
 
             std::set<char> next_list;
             bool finished = false;
-            for (char rh: rhs) {
-                if (is_terminal(rh)) {
-                    if (rh != EPSILON) {
-                        next_list.insert(rh);
+            for (char c: rhs) {
+                if (is_terminal(c)) {
+                    if (c != EPSILON) {
+                        next_list.insert(c);
                         finished = true;
                         break;
                     }
                     continue;
                 }
 
-                auto firsts_copy = firsts.at(rh);
+                auto firsts_copy = firsts.at(c);
                 if (firsts_copy.find(EPSILON) == firsts_copy.end()) {
                     next_list.insert(firsts_copy.begin(), firsts_copy.end());
                     finished = true;
@@ -221,21 +206,19 @@ private:
                 firsts_copy.erase(EPSILON);
                 next_list.insert(firsts_copy.begin(), firsts_copy.end());
             }
-            // If the whole rhs can be skipped through epsilon or reaching the end
-            // Add follow to next list
+            // If the whole rhs can be skipped through ϵ or reaching the end
+            // Add FOLLOW to NEXT list
             if (!finished) {
                 const auto &my_follows = follows.at(lhs);
                 next_list.insert(my_follows.begin(), my_follows.end());
             }
-
             size_t row = distance(non_terms.begin(), non_terms.find(lhs));
-
-            for (char ch: next_list) {
-                size_t col = distance(terms.begin(), terms.find(ch));
-                if (!result[row][col].empty()) {
+            for (char c: next_list) {
+                size_t col = distance(terms.begin(), terms.find(c));
+                //if (!result[row][col].empty()) {
                     // cout<<"Collision at ["<<lhs<<"]["<<ch<<"] for production "<<prod_num<<"\n";
                     // continue;
-                }
+                //}
                 result[row][col].insert(prod_num);
             }
             prod_num++;
@@ -273,7 +256,7 @@ std::ostream &operator<<(std::ostream &os, const std::set<T> &s) {
 
 
 std::ostream &operator<<(std::ostream &out, const Grammar &gram) {
-    for (int count = 1; const auto &[lhs, rhs]: gram.productions) {
+    for (int count = 0; const auto &[lhs, rhs]: gram.productions) {
         out << count++ << ". " << lhs << " → " << (rhs[0] == EPSILON ? "ϵ" : rhs) << "\n";
     }
     out << "\n"
@@ -307,40 +290,29 @@ std::ostream &operator<<(std::ostream &out, const Grammar &gram) {
 }
 
 struct Checker {
-
     const Grammar &gram;
 
     explicit Checker(const Grammar &gram) : gram(gram) {
     }
 
-    bool is_acc2(std::string input_string, std::stack<char> st, size_t prod) {
-        st.pop();
-        auto [_, rhs] = gram[prod];
-        if (rhs[0] != EPSILON) {
-            for (auto ch = rhs.rbegin(); ch != rhs.rend(); ++ch) {
-                st.push(*ch);
-            }
-        }
-        return is_acc(std::move(input_string), st);
-    }
-
-    bool is_acc(std::string input_string, std::stack<char> st) {
+    bool helper(std::string input, std::stack<char> stack) {
         // cout<<"Processing input string\n";
-        while (!st.empty() && !input_string.empty()) {
+        while (!stack.empty() && !input.empty()) {
             // If stack top same as input string char remove it
 
-            if (input_string[0] == st.top()) {
-                st.pop();
-                input_string.erase(0, 1);
+            if (input[0] == stack.top()) {
+                stack.pop();
+                input.erase(0, 1);
                 continue;
             }
-            if (Grammar::is_terminal(st.top())) {
+            if (Grammar::is_terminal(stack.top())) {
                 //cout<<"Unmatched terminal found\n";
                 return false;
             }
-            char stack_top = st.top();
+            char stack_top = stack.top();
+            stack.pop();
             size_t row = distance(gram.non_terms.begin(), gram.non_terms.find(stack_top));
-            size_t col = distance(gram.terms.begin(), gram.terms.find(input_string[0]));
+            size_t col = distance(gram.terms.begin(), gram.terms.find(input[0]));
             auto prod_num = gram.parse_table[row][col];
 
             if (prod_num.empty()) {
@@ -348,42 +320,43 @@ struct Checker {
                 return false;
             }
             if (prod_num.size() == 1) {
-                st.pop();
-                std::string rhs = gram[*prod_num.begin()].second;
-                if (rhs[0] == EPSILON) {
-                    continue;
-                }
-                for (auto ch = rhs.rbegin(); ch != rhs.rend(); ++ch) {
-                    st.push(*ch);
-                }
-            } else {
-                bool accepted = false;
-                for (size_t num: prod_num) {
-                    if (is_acc2(input_string, st, num)) {
-                        accepted = true;
+                auto [_, rhs] = gram[*prod_num.begin()];
+                if (rhs[0] != EPSILON) {
+                    for (auto ch = rhs.rbegin(); ch != rhs.rend(); ++ch) {
+                        stack.push(*ch);
                     }
                 }
-                return accepted;
+                continue;
             }
+            return std::any_of(prod_num.begin(), prod_num.end(), [this, &input, &stack](size_t num){
+                auto [_, rhs] = gram[num];
+                auto _st = stack;
+                if (rhs[0] != EPSILON) {
+                    for (auto ch = rhs.rbegin(); ch != rhs.rend(); ++ch) {
+                        _st.push(*ch);
+                    }
+                }
+                return helper(std::move(input), std::move(_st));
+            });
         }
         return true;
     }
 
-    static CheckerResult is_accepted(std::string my_input_string,
+    static CheckerResult is_accepted(std::string input,
                                      const Grammar &gram) {
-        my_input_string.push_back(END_OF_INPUT);
-        std::stack<char> my_st;
-        my_st.push(END_OF_INPUT);
-        my_st.push(gram.starter());
+        input.push_back(END_OF_INPUT);
+        std::stack<char> stack;
+        stack.push(END_OF_INPUT);
+        stack.push(gram.starter());
 
         // Check if input string is valid
-        for (char &ch: my_input_string) {
-            if (gram.terms.find(ch) == gram.terms.end()) {
+        for (char c: input) {
+            if (gram.terms.find(c) == gram.terms.end()) {
                 return INPUT_INVALID;
             }
         }
 
-        return Checker{gram}.is_acc(my_input_string, my_st) ? ACCEPTED : REJECTED;
+        return Checker{gram}.helper(input, stack) ? ACCEPTED : REJECTED;
     }
 };
 
