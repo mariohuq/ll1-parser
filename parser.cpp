@@ -5,6 +5,7 @@
 #include <set>
 #include <map>
 #include <stack>
+#include <algorithm>
 
 using Terminal = char;
 using Nonterminal = char;
@@ -14,7 +15,7 @@ using TermSet = std::map<Nonterminal, std::set<Terminal>>;
 using Production = std::pair<Nonterminal, std::string>;
 
 constexpr Terminal EPSILON = 'e';
-constexpr char END_OF_INPUT = '$';
+constexpr Terminal END_OF_INPUT = '$';
 
 enum CheckerResult {
     INPUT_INVALID = -1,
@@ -23,20 +24,22 @@ enum CheckerResult {
 };
 
 struct Grammar {
+    // Order of declaration is important, because functions rely on previously set fields!
     std::vector<Production> productions;
-    ParseTable parse_table;
-    TermSet firsts;
-    TermSet follows;
     std::set<Nonterminal> non_terms;
     std::set<Terminal> terms;
+    TermSet firsts;
+    TermSet follows;
+    ParseTable parse_table;
 
-    explicit Grammar(const std::vector<Production> &productions) : productions(productions) {
-        non_terms = get_non_terms();
-        terms = get_terms();
-        firsts = compute_firsts();
-        follows = compute_follows();
-        parse_table = build_parse_table();
-    }
+    explicit Grammar(const std::vector<Production> &productions)
+        : productions(productions)
+        , non_terms{get_non_terms()}
+        , terms{get_terms()}
+        , firsts{compute_firsts()}
+        , follows{compute_follows()}
+        , parse_table{build_parse_table()}
+        {}
 
     [[nodiscard]] Nonterminal starter() const {
         return productions.front().first;
@@ -46,16 +49,22 @@ struct Grammar {
         return productions[index];
     }
 
+    static bool is_terminal(char ch) {
+        return !isupper(ch);
+    }
+
+private:
     void find_follow(TermSet &the_follows, Nonterminal non_term) const {
 
         // cout<<"Finding follow of "<<non_term<<"\n";
 
         for (const auto &[lhs, rhs]: productions) {
-            // finished is true when finding follow from this production is complete
+            // finished when finding FOLLOW from this production is complete
             bool finished = true;
             auto ch = rhs.begin();
 
             // Skip variables till read non-terminal
+            //ch = std::find(ch, rhs.end(), non_term);
             for (; ch != rhs.end(); ++ch) {
                 if (*ch == non_term) {
                     finished = false;
@@ -64,28 +73,28 @@ struct Grammar {
             }
             ++ch;
             for (; ch != rhs.end() && !finished; ++ch) {
-                // If non-terminal, just append to follow
-                if (!isupper(*ch)) {
+                // If terminal, just append to FOLLOW
+                if (is_terminal(*ch)) {
                     the_follows[non_term].insert(*ch);
                     finished = true;
                     break;
                 }
 
                 auto firsts_copy = firsts.at(*ch);
-                // If char's firsts doesn't have epsilon follow search is over
+                // If char's FIRSTs don't have ϵ FOLLOW search is over
                 if (firsts_copy.find(EPSILON) == firsts_copy.end()) {
                     the_follows[non_term].insert(firsts_copy.begin(), firsts_copy.end());
                     finished = true;
                     break;
                 }
-                // Else next char has to be checked after appending firsts to follow
+                // Else next char has to be checked after appending FIRSTs to FOLLOW
                 firsts_copy.erase(EPSILON);
                 the_follows[non_term].insert(firsts_copy.begin(), firsts_copy.end());
             }
 
-            // If end of production, follow same as follow of variable
+            // If end of production reached, FOLLOW is same as FOLLOW of variable
             if (ch == rhs.end() && !finished) {
-                // Find follow if it doesn't have
+                // Find FOLLOW if it doesn't have
                 if (the_follows[lhs].empty()) {
                     find_follow(the_follows, lhs);
                 }
@@ -107,7 +116,7 @@ struct Grammar {
             // Loop till a non-terminal or no epsilon variable found
             for (auto ch = rhs.begin(); ch != rhs.end(); ++ch) {
                 // If first char in production a non term, add it to firsts list
-                if (!isupper(*ch)) {
+                if (is_terminal(*ch)) {
                     the_firsts[non_term].insert(*ch);
                     break;
                 } else {
@@ -164,18 +173,17 @@ struct Grammar {
 
     [[nodiscard]] std::set<Nonterminal> get_non_terms() const {
         std::set<Nonterminal> result;
-        for (auto &[nont, _]: productions) {
-            result.insert(nont);
+        for (auto &[lhs, _]: productions) {
+            result.insert(lhs);
         }
         return result;
     }
-
 
     [[nodiscard]] std::set<Terminal> get_terms() const {
         std::set<Terminal> result;
         for (const auto &[_, rhs]: productions) {
             for (char ch: rhs) {
-                if (!isupper(ch)) {
+                if (is_terminal(ch)) {
                     result.insert(ch);
                 }
             }
@@ -195,7 +203,7 @@ struct Grammar {
             std::set<char> next_list;
             bool finished = false;
             for (char rh: rhs) {
-                if (!isupper(rh)) {
+                if (is_terminal(rh)) {
                     if (rh != EPSILON) {
                         next_list.insert(rh);
                         finished = true;
@@ -273,13 +281,13 @@ std::ostream &operator<<(std::ostream &out, const Grammar &gram) {
         << "The terminals in the grammar are: " << gram.terms << "\n"
         << "\n"
         << "Firsts list: \n";
-    for (const auto &[nont, set]: gram.firsts) {
-        out << "FIRST(" << nont << ") = " << set << "\n";
+    for (const auto &[nonterminal, set]: gram.firsts) {
+        out << "FIRST(" << nonterminal << ") = " << set << "\n";
     }
     out << "\n"
         << "Follows list: \n";
-    for (const auto &[nont, set]: gram.follows) {
-        out << "FOLLOW(" << nont << ") = " << set << "\n";
+    for (const auto &[nonterminal, set]: gram.follows) {
+        out << "FOLLOW(" << nonterminal << ") = " << set << "\n";
     }
     out << "\n"
         << "Parsing Table: \n"
@@ -326,7 +334,7 @@ struct Checker {
                 input_string.erase(0, 1);
                 continue;
             }
-            if (!isupper(st.top())) {
+            if (Grammar::is_terminal(st.top())) {
                 //cout<<"Unmatched terminal found\n";
                 return false;
             }
@@ -363,8 +371,8 @@ struct Checker {
 
     static CheckerResult is_accepted(std::string my_input_string,
                                      const Grammar &gram) {
-        std::stack<char> my_st;
         my_input_string.push_back(END_OF_INPUT);
+        std::stack<char> my_st;
         my_st.push(END_OF_INPUT);
         my_st.push(gram.starter());
 
