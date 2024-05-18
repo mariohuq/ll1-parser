@@ -6,8 +6,6 @@
 #include <map>
 #include <stack>
 
-constexpr int INPUT_STRING_INVALID = -1;
-
 using Terminal = char;
 using Nonterminal = char;
 
@@ -17,6 +15,12 @@ using Production = std::pair<Nonterminal, std::string>;
 
 constexpr Terminal EPSILON = 'e';
 constexpr char END_OF_INPUT = '$';
+
+enum CheckerResult {
+    INPUT_INVALID = -1,
+    ACCEPTED = 1,
+    REJECTED = 0
+};
 
 struct Grammar {
     std::vector< Production > productions;
@@ -239,7 +243,7 @@ std::vector<Production> parse_file(std::istream& grammar_file) {
 
 	while(!grammar_file.eof()) {
 		char buffer[20];
-		grammar_file.getline(buffer, 19);
+        grammar_file.getline(buffer, sizeof(buffer));
 		gram.emplace_back(buffer[0], buffer+3);
 	}
     return gram;
@@ -262,53 +266,35 @@ std::ostream& operator<<(std::ostream& os, const std::set<T>& s) {
 
 
 std::ostream& operator<<(std::ostream& out, const Grammar& gram) {
-    int count = 0;
-    for (const auto& [lhs, rhs] : gram.productions) {
-        out << count++ << ".  " << lhs << " -> " << rhs << "\n";
+    for (int count = 1; const auto& [lhs, rhs] : gram.productions) {
+        out << count++ << ". " << lhs << " → " << (rhs[0] == EPSILON ? "ϵ" : rhs) << "\n";
     }
     out<<"\n"
-	   <<"The non-terminals in the grammar are: ";
-	for(Nonterminal non_term : gram.non_terms) {
-		out<<non_term<<" ";
-	}
-	out<<"\n"
- 	   <<"The terminals in the grammar are: ";
-	for(Terminal term : gram.terms) {
-		out<<term<<" ";
-	}
-	out<<"\n\n"
+	   <<"The non-terminals in the grammar are: " << gram.non_terms <<"\n"
+ 	   <<"The terminals in the grammar are: " << gram.terms <<"\n"
+       <<"\n"
 	   <<"Firsts list: \n";
-	for(auto & first : gram.firsts) {
-		out<<first.first<<" : ";
-		for(char firsts_it : first.second) {
-			out<<firsts_it<<" ";
-		}
-		out<<"\n";
+	for(const auto & [nont, set] : gram.firsts) {
+		out<< "FIRST(" << nont<<") = " << set <<"\n";
 	}
 	out<<"\n"
 	   <<"Follows list: \n";
-	for(auto & follow : gram.follows) {
-		out<<follow.first<<" : ";
-		for(char follows_it : follow.second) {
-			out<<follows_it<<" ";
-		}
-		out<<"\n";
+	for(const auto & [nont, set] : gram.follows) {
+		out<<"FOLLOW(" << nont<<") = " << set <<"\n";
 	}
 	out<<"\n"
        <<"Parsing Table: \n"
-       <<"   ";
+       <<"\t";
 	for(char term : gram.terms) {
-		out<<term<<" ";
+		out<<term<<"\t";
 	}
 	out<<"\n";
-    size_t row_num = 0;
-	for(Nonterminal n : gram.non_terms) {
-        out << n << "  ";
-        for (int col = 0; col < gram.terms.size(); ++col) {
-            out << gram.parse_table[row_num][col] << " ";
+	for(size_t row_num = 0; Nonterminal n : gram.non_terms) {
+        out << n << "\t";
+        for (const auto& el : gram.parse_table[row_num++]) {
+            out << el << "\t";
         }
         out << "\n";
-        row_num++;
     }
     return out;
 }
@@ -375,7 +361,7 @@ struct Checker {
         return true;
     }
 
-static int is_accepted(std::string my_input_string,
+static CheckerResult is_accepted(std::string my_input_string,
                 const Grammar& gram) {
     std::stack<char> my_st;
     my_input_string.push_back(END_OF_INPUT);
@@ -385,69 +371,65 @@ static int is_accepted(std::string my_input_string,
     // Check if input string is valid
     for(char & ch : my_input_string) {
         if(gram.terms.find(ch) == gram.terms.end()) {
-            return INPUT_STRING_INVALID;
+            return INPUT_INVALID;
         }
     }
 
-    return Checker{gram}.is_acc(my_input_string, my_st);
+    return Checker{gram}.is_acc(my_input_string, my_st) ? ACCEPTED : REJECTED;
 }
 };
+
+void verdict(const std::string& str, CheckerResult accepted) {
+    std::cout<< '[' << str << "] ";
+    switch (accepted) {
+        case INPUT_INVALID:
+            std::cout << "has unknown symbols";
+            break;
+        case ACCEPTED:
+            std::cout<< "accepted";
+            break;
+        case REJECTED:
+            std::cout << "rejected";
+            break;
+    }
+    std::cout<<"\n";
+}
 
 int main(int argc, char const *argv[])
 {
     using std::cout;
 	if(argc != 2) {
-		cout<<"Arguments should be <grammar file>\n";
-		return 1;
+		cout<<"Usage:\n"
+            << argv[0] <<" <path to grammar file>\n";
+		return EXIT_FAILURE;
 	}
-	
+
 	// Parsing the grammar file
 	std::ifstream grammar_file{argv[1], std::ios::in};
 	if(grammar_file.fail()) {
 		cout<<"Error in opening grammar file\n";
-		return 2;
+		return EXIT_FAILURE;
 	}
 	Grammar gram{parse_file(grammar_file)};
     cout<<"Grammar parsed: \n" << gram << "\n";
 
     std::ifstream rights{ "right-strings.txt" };
-
     while (rights) {
         std::string str;
-        // cout << "> ";
         std::getline(rights, str);
         if (str.empty()) { continue; }
-        int accepted = Checker::is_accepted(str, gram);
-        if (accepted == INPUT_STRING_INVALID) {
-            cout<< '[' << str << "] has unknown symbols\n";
-        }
-        else if(accepted) {
-            cout<< '[' << str << "] accepted\n";
-        }
-        else {
-            cout << '[' << str << "] rejected\n";
-        }
+        auto accepted = Checker::is_accepted(str, gram);
+        verdict(str, accepted);
     }
-
+    cout << "Press Ctrl+D to finish\n";
     while (true) {
         std::string str;
         cout << "> ";
-        std::getline(std::cin, str);
-        int accepted = Checker::is_accepted(str, gram);
-        if (accepted == INPUT_STRING_INVALID) {
-            cout<< '[' << str << "] has unknown symbols\n";
+        if (!std::getline(std::cin, str)) {
+            break;
         }
-        else if(accepted) {
-            cout<< '[' << str << "] accepted\n";
-        }
-        else {
-            cout << '[' << str << "] rejected\n";
-        }
+        auto accepted = Checker::is_accepted(str, gram);
+        verdict(str, accepted);
     }
-
-	return 0;
+    return EXIT_SUCCESS;
 }
-
-
-
-
