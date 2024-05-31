@@ -263,6 +263,9 @@ std::vector<Production> parse_file(std::istream &grammar_file) {
 
 template<typename T>
 std::ostream &operator<<(std::ostream &os, const std::set<T> &s) {
+    if (s.empty()) {
+        return os << "∅";
+    }
     os << "{";
     bool is_first = true;
     for (T e: s) {
@@ -271,7 +274,11 @@ std::ostream &operator<<(std::ostream &os, const std::set<T> &s) {
         } else {
             os << ", ";
         }
-        os << e;
+        if (e == EPSILON) {
+            os << "ε";
+        } else {
+            os << e;
+        }
     }
     return os << "}";
 }
@@ -279,7 +286,7 @@ std::ostream &operator<<(std::ostream &os, const std::set<T> &s) {
 
 std::ostream &operator<<(std::ostream &out, const Grammar &gram) {
     for (int count = 0; const auto &[lhs, rhs]: gram.productions) {
-        out << count++ << ". " << lhs << " → " << (rhs[0] == EPSILON ? "ϵ" : rhs) << "\n";
+        out << count++ << ". " << lhs << " → " << (rhs[1] == EPSILON ? (std::string{ rhs[0] } + "ϵ" + rhs[2]) : rhs) << "\n";
     }
     out << "\n"
         << "The non-terminals in the grammar are: " << gram.non_terms << "\n"
