@@ -1,0 +1,48 @@
+<Sentence> ::= <DeclarativeFutCont> `.' | <W> <NounGroup> <VerbGroup> `?'
+
+<DeclarativeFutCont> ::= <NounGroup> <W> <VerbGroup>
+
+<W> ::= `will' <WN>
+<WN> ::= `not' | e
+
+<VerbGroup> ::= `be' <Ving> <TimeAdverbial>
+
+<TimeAdverbial> ::= `for' <Number> <Period>  | `before' <DeclarativePres> | `when' <DeclarativePres> | `after' <DeclarativePres> | `in' <Year>  | `next' <TimeAdverbial1>
+<TimeAdverbial1> ::= <Weekday> | `month' | `week' | `day'
+
+<DeclarativePres> ::= <NounGroup> <Verb1> <TimeAdverbial>
+
+<NounGroup> ::= <Pronoun> | <Person>
+
+<Verb1> ::= `comes' `back' | `returns' <Verb11>
+
+<Verb11> ::= `home' <Verb12> | <Verb12>
+<Verb12> ::= `from' <Event> | e
+
+<Ving> ::= `playing' <Game> | `doing' <Activity> | `travelling' `to' <Place> | `cooking' | `working' | `attending' <Event>
+
+<Number> ::= `2' | `3' | `4' | `5' | `6' | `7' | `8' | `9'
+
+<Period> ::= `years' | `hours' | `months' | `days' | `weeks'
+
+<Year> ::= `2025' | `2026' |`2027' | `2028' | `2029'
+
+<Weekday> ::= `Monday' | `Tuesday' | `Friday' | `Thursday' | `Saturday' | `Sunday'
+
+<Month> ::= `January' | `February' | `March' | `April' | `May' | `June' | `July' | `August' | `September' | `October' | `November' | `December'
+
+<Adjective> ::= `angry' | `funny' | `happy' | `evil' | `sad' | `shy'
+
+<Person> ::= `girl' | `boy' | `man' | `woman' | `sister' | `brother' | `uncle' | `aunt' | <Adjective> <Person>
+
+<Pronoun> ::= `I' | `you' | `he' | `she' | `we' | `they'
+
+<Game> ::= `the' <Game1> | `chess'
+<Game1> ::= `game' | `instruments' | `piano'
+
+<Activity> ::= `homework' | `exercises' | <Activity1> `training' | `chores'
+<Activity1> ::= `volleyball' | `ski'
+
+<Place> ::= `Moscow' | `Russia' | `Canada' | `Italy' | `Beijin' | `Riga'
+
+<Event> ::= `the' `party' | `exposition' | `show' | `meeting' | `classes'
