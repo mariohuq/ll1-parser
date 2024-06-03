@@ -561,7 +561,9 @@ std::string generate(const Grammar& gram) {
         stack.pop();
         size_t n = alternatives[nid].size();
         auto termid = alternatives[nid][D{0, n-1}(gen)];
-        const auto& [_, rhs] = gram.productions[*gram.parse_table[nid][termid].begin()];
+        auto variants = gram.parse_table[nid][termid];
+
+        const auto& [_, rhs] = gram.productions[*std::next(variants.begin(),D{0, variants.size() - 1}(gen))];
         if (rhs[0] == EPSILON_ID) continue;
         for (auto ch = rhs.rbegin(); ch != rhs.rend(); ++ch) {
             stack.push(*ch);

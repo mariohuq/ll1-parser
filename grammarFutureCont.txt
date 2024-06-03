@@ -5,10 +5,9 @@
 <W> ::= `will' <WN>
 <WN> ::= `not' | e
 
-<VerbPhrase> ::= `be' <Ving> <VerbPhrase1>
-<VerbPhrase1> ::= <TimeAdjunct> | e
+<VerbPhrase> ::= `be' <Ving> <TimeAdjunct>
 
-<TimeAdjunct> ::= `for' <Number> <Period>  | `before' <DeclarativePres> | `when' <DeclarativePres> | `after' <DeclarativePres> | `in' <Year>  | `next' <TimeAdjunct1>
+<TimeAdjunct> ::= e | `for' <Number> <Period>  | `before' <DeclarativePres> | `when' <DeclarativePres> | `after' <DeclarativePres> | `in' <Year>  | `next' <TimeAdjunct1>
 <TimeAdjunct1> ::= <Weekday> | `month' | `week' | `day'
 
 <DeclarativePres> ::= <NounPhrase> <Verb1> <PlaceAdjunct> <TimeAdjunct>
