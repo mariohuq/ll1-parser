@@ -1,18 +1,20 @@
-<Sentence> ::= <DeclarativeFutCont> `.' | <W> <NounGroup> <VerbGroup> `?'
+<Sentence> ::= <DeclarativeFutCont> `.' | <W> <NounPhrase> <VerbPhrase> `?'
 
-<DeclarativeFutCont> ::= <NounGroup> <W> <VerbGroup>
+<DeclarativeFutCont> ::= <NounPhrase> <W> <VerbPhrase>
 
 <W> ::= `will' <WN>
 <WN> ::= `not' | e
 
-<VerbGroup> ::= `be' <Ving> <TimeAdverbial>
+<VerbPhrase> ::= `be' <Ving> <VerbPhrase1>
+<VerbPhrase1> ::= <TimeAdjunct> | e
 
-<TimeAdverbial> ::= `for' <Number> <Period>  | `before' <DeclarativePres> | `when' <DeclarativePres> | `after' <DeclarativePres> | `in' <Year>  | `next' <TimeAdverbial1>
-<TimeAdverbial1> ::= <Weekday> | `month' | `week' | `day'
+<TimeAdjunct> ::= `for' <Number> <Period>  | `before' <DeclarativePres> | `when' <DeclarativePres> | `after' <DeclarativePres> | `in' <Year>  | `next' <TimeAdjunct1>
+<TimeAdjunct1> ::= <Weekday> | `month' | `week' | `day'
 
-<DeclarativePres> ::= <NounGroup> <Verb1> <TimeAdverbial>
+<DeclarativePres> ::= <NounPhrase> <Verb1> <PlaceAdjunct> <TimeAdjunct>
+<PlaceAdjunct> ::= e | `where' <DeclarativePres>
 
-<NounGroup> ::= <Pronoun> | <Person>
+<NounPhrase> ::= <Pronoun> | <Person>
 
 <Verb1> ::= `comes' `back' | `returns' <Verb11>
 
@@ -35,7 +37,7 @@
 
 <Person> ::= `girl' | `boy' | `man' | `woman' | `sister' | `brother' | `uncle' | `aunt' | <Adjective> <Person>
 
-<Pronoun> ::= `I' | `you' | `he' | `she' | `we' | `they'
+<Pronoun> ::= `I' | `you' | `he' | `she' | `they'
 
 <Game> ::= `the' <Game1> | `chess'
 <Game1> ::= `game' | `instruments' | `piano'

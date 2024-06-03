@@ -463,13 +463,14 @@ struct Checker {
             for (size_t num: prod_nums) {
                 auto [_, rhs] = gram[num];
                 auto _st = stack;
-                if (rhs[0] != EPSILON) {
+                if (rhs[0] != EPSILON_ID) {
                     for (auto ch = rhs.rbegin(); ch != rhs.rend(); ++ch) {
                         _st.push(*ch);
                     }
                 }
 
-                auto acc = helper(input.substr(iter->first - input.begin()), std::move(_st));
+                auto it = iter->second - input.begin();
+                auto acc = helper(token + " " + input.substr(it), std::move(_st));
                 if (acc) {
                     return true;
                 }
