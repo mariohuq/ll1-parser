@@ -7,6 +7,7 @@
 #include <stack>
 #include <algorithm>
 #include <regex>
+#include <random>
 
 using Terminal = char;
 
@@ -220,21 +221,6 @@ private:
         return result;
     }
 
-    [[nodiscard]] std::set<TerminalId> get_terms() const {
-        std::set<TerminalId> result;
-        for (const auto &[_, rhs]: productions) {
-            for (Id ch: rhs) {
-                if (is_terminal(ch)) {
-                    result.insert(ch);
-                }
-            }
-        }
-        // Remove ϵ and add end character $
-        result.erase(EPSILON_ID);
-        result.insert(END_OF_INPUT_ID);
-        return result;
-    }
-
     [[nodiscard]] ParseTable build_parse_table() const {
         ParseTable result{non_terms.size(), std::vector<std::set<size_t>>(terms.size())};
 
@@ -245,7 +231,7 @@ private:
             bool finished = false;
             for (Id c: rhs) {
                 if (is_terminal(c)) {
-                    if (c != EPSILON) {
+                    if (c != EPSILON_ID) {
                         next_list.insert(c);
                         finished = true;
                         break;
@@ -310,6 +296,9 @@ std::pair<std::vector<Production>, std::pair<BiMap, BiMap>> parse_file(std::istr
         std::sregex_token_iterator iter{line.begin(), line.end(), split_regex, -1};
         std::sregex_token_iterator end;
         for ( ; iter != end; ++iter) {
+            if (std::string{*iter}.empty()) {
+                continue;
+            }
             std::vector<Id> rhs{};
             std::smatch match;
             std::stringstream ss { *iter };
@@ -336,6 +325,9 @@ std::pair<std::vector<Production>, std::pair<BiMap, BiMap>> parse_file(std::istr
             gram.emplace_back(lhs, rhs);
         }
     }
+    // add end character $
+    terms.fromId[END_OF_INPUT_ID] = {END_OF_INPUT};
+    terms.toId[{END_OF_INPUT}] = END_OF_INPUT_ID;
     return {gram, {nonts, terms}};
 }
 
@@ -398,7 +390,7 @@ std::ostream &operator<<(std::ostream &out, const Grammar &gram) {
             if (s == END_OF_INPUT_ID) {
                 names.insert("$");
             } else {
-            names.insert(gram.terms.get(s));
+                names.insert(gram.terms.get(s));
             }
         }
         out << "FOLLOW(" << gram.non_terms.get(nonterminal) << ") = " << names << "\n";
@@ -421,29 +413,38 @@ std::ostream &operator<<(std::ostream &out, const Grammar &gram) {
 }
 
 struct Checker {
+    static const std::regex split_regex;
     const Grammar &gram;
 
     explicit Checker(const Grammar &gram) : gram(gram) {
     }
 
     bool helper(std::string input, std::stack<Id> stack) {
+        std::sregex_token_iterator iter{input.begin(), input.end(), split_regex, -1};
+        std::sregex_token_iterator end;
+
         // cout<<"Processing input string\n";
-        while (!stack.empty() && !input.empty()) {
-            // If stack top same as input string char remove it
-            if (input[0] == stack.top()) {
-                stack.pop();
-                input.erase(0, 1);
+        while (!stack.empty() && iter != end) {
+            if (std::string{*iter}.empty()) {
+                iter++;
                 continue;
             }
+            // If stack top same as input string char remove it
+
+            std::string token = *iter;
             if (Grammar::is_terminal(stack.top())) {
+                if (gram.terms.get(stack.top()) == token) {
+                    stack.pop();
+                    iter++;
+                    continue;
+                }
                 //cout<<"Unmatched terminal found\n";
                 return false;
             }
             NonterminalId stack_top = stack.top();
             stack.pop();
             size_t row = stack_top;
-            // todo
-            size_t col = gram.terms.toId.at({input[0]}) - TERMINALS_OFFSET;
+            size_t col = gram.terms.toId.at(token) - TERMINALS_OFFSET;
             auto prod_nums = gram.parse_table[row][col];
 
             if (prod_nums.empty()) {
@@ -452,13 +453,9 @@ struct Checker {
             }
             if (prod_nums.size() == 1) {
                 auto [_, rhs] = gram[*prod_nums.begin()];
-                if (rhs[1] != EPSILON) {
-                    for (auto ch = rhs.rbegin(); ch != rhs.rend(); ++ch) {
-                        stack.push(*ch);
-                    }
-                } else {
-                    stack.push(rhs[2]);
-                    stack.push(rhs[0]);
+                if (rhs[0] == EPSILON_ID) continue;
+                for (auto ch1 = rhs.rbegin(); ch1 != rhs.rend(); ++ch1) {
+                    stack.push(*ch1);
                 }
                 continue;
             }
@@ -466,15 +463,13 @@ struct Checker {
             for (size_t num: prod_nums) {
                 auto [_, rhs] = gram[num];
                 auto _st = stack;
-                if (rhs[1] != EPSILON) {
+                if (rhs[0] != EPSILON) {
                     for (auto ch = rhs.rbegin(); ch != rhs.rend(); ++ch) {
                         _st.push(*ch);
                     }
-                } else {
-                    _st.push(rhs[2]);
-                    _st.push(rhs[0]);
                 }
-                auto acc = helper(input, std::move(_st));
+
+                auto acc = helper(input.substr(iter->first - input.begin()), std::move(_st));
                 if (acc) {
                     return true;
                 }
@@ -486,14 +481,26 @@ struct Checker {
 
     static CheckerResult is_accepted(std::string input,
                                      const Grammar &gram) {
+        if (input.empty()) {
+            return REJECTED;
+        }
+        input[0] = tolower(input[0]);
+        input.push_back(' ');
         input.push_back(END_OF_INPUT);
         std::stack<Id> stack;
         stack.push(END_OF_INPUT_ID);
         stack.push(gram.starter());
 
+        std::sregex_token_iterator iter{input.begin(), input.end(), split_regex, -1};
+        std::sregex_token_iterator end;
         // Check if input string is valid
-        for (char c: input) {
-            if (gram.terms.toId.find({c}) == gram.terms.toId.end()) {
+        for (; iter != end; iter++) {
+            std::string token{*iter};
+            if (token.empty()) {
+                continue;
+            }
+            if (gram.terms.toId.find(token) == gram.terms.toId.end()) {
+                std::cerr << "Unknown word: [" << token << "]\n";
                 return INPUT_INVALID;
             }
         }
@@ -506,11 +513,13 @@ struct Checker {
     }
 };
 
+const std::regex Checker::split_regex{R"(\s+|(?=\.|\?))"};
+
 void verdict(const std::string &str, CheckerResult accepted) {
     std::cout << '[' << str << "] ";
     switch (accepted) {
         case INPUT_INVALID:
-            std::cout << "has unknown symbols";
+            std::cout << "has unknown words";
             break;
         case ACCEPTED:
             std::cout << "accepted";
@@ -520,6 +529,48 @@ void verdict(const std::string &str, CheckerResult accepted) {
             break;
     }
     std::cout << "\n";
+}
+
+std::string generate(const Grammar& gram) {
+    using D = std::uniform_int_distribution<size_t>;
+    std::random_device rd; // obtain a random number from hardware
+    std::mt19937 gen(rd()); // seed the generator
+
+    std::stringstream ss;
+
+    std::vector<std::vector<TerminalId>> alternatives{gram.parse_table.size()};
+    for (size_t i = 0; i < alternatives.size(); ++i) {
+        for (size_t j = 0; j < gram.parse_table[i].size(); ++j) {
+            const auto& s = gram.parse_table[i][j];
+            if (s.empty()) {
+                continue;
+            }
+            alternatives[i].push_back(j);
+        }
+    }
+    std::stack<NonterminalId> stack;
+    stack.push(gram.starter());
+    while (!stack.empty()) {
+        if (Grammar::is_terminal(stack.top())) {
+            ss << gram.terms.get(stack.top()) << " ";
+            stack.pop();
+            continue;
+        }
+        NonterminalId nid = stack.top();
+        stack.pop();
+        size_t n = alternatives[nid].size();
+        auto termid = alternatives[nid][D{0, n-1}(gen)];
+        const auto& [_, rhs] = gram.productions[*gram.parse_table[nid][termid].begin()];
+        if (rhs[0] == EPSILON_ID) continue;
+        for (auto ch = rhs.rbegin(); ch != rhs.rend(); ++ch) {
+            stack.push(*ch);
+        }
+    }
+    auto result = ss.str();
+    result[0] = toupper(result[0]);
+    result.erase(result.size() - 3, 1);
+    result.erase(result.size() - 1, 1);
+    return result;
 }
 
 int main(int argc, char const *argv[]) {
@@ -547,14 +598,21 @@ int main(int argc, char const *argv[]) {
 //        if (str.empty()) { continue; }
 //        verdict(str, Checker::is_accepted(str, gram));
 //    }
-//    cout << "Press Ctrl+D to finish\n";
-//    while (true) {
-//        std::string str;
-//        cout << "> ";
-//        if (!std::getline(std::cin, str)) {
-//            break;
-//        }
-//        verdict(str, Checker::is_accepted(str, gram));
-//    }
+
+
+
+    cout << "Press Ctrl+D to finish, ! to generate\n";
+    while (true) {
+        std::string str;
+        cout << "> ";
+        if (!std::getline(std::cin, str)) {
+            break;
+        }
+        if (!str.empty() && str[0] == '!') {
+            cout << "Random sentence: [" << generate(gram) << "]\n";
+        } else {
+            verdict(str, Checker::is_accepted(str, gram));
+        }
+    }
     return EXIT_SUCCESS;
 }
