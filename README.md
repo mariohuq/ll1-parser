@@ -2,25 +2,27 @@
 
 An LL(1) parser made in C++ with STL libraries.
 
-It prints out the first, follow, parse table and checks if the given input string is accepted by the given grammar.
+Like the original program, it prints out the first, follow, parse table and checks if the given input string is accepted by the given grammar.
+
+Also, it generates random string that accepted by the grammar (enter `!`).
 
 
 ## Usage
-Compile the code with g++ and run with arguments <grammar-file> <input-string>
+Compile the code with g++ and run with arguments `<grammar-file>`
 
-Grammar file contains all the productions for the grammar.
+Grammar file contains all the productions for the grammar:
 
-* Each line contains a production for the grammar in the format LHS->RHS
+* Each line contains a production for the grammar in the format `LHS -> RHS`
 * All upper case alphabets are non-terminals or variables.
-* The letter e is considered as empty string or epsilon.
+* The letter `e` is considered as empty string or epsilon.
 * Dollar sign is used as end character.
-* Any other character is taken as a terminal for the grammar
+* Any other character is taken as a terminal for the grammar.
 
 Sample Usage:
 
 ```bash
 g++ parser.cpp -o parser
-./parser grammar1.txt ab
+./parser grammar1.txt
 ```
 
 Output:
@@ -51,5 +53,6 @@ A  2 1 2
 B  4 - 3
 S  0 0 0
 
+> a
 Input string is accepted
 ```
