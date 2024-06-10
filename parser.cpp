@@ -485,7 +485,7 @@ struct Checker {
         if (input.empty()) {
             return REJECTED;
         }
-        input[0] = tolower(input[0]);
+        if (input[0] != 'I') { input[0] = tolower(input[0]); }
         input.push_back(' ');
         input.push_back(END_OF_INPUT);
         std::stack<Id> stack;
