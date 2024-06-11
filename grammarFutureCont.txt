@@ -30,8 +30,6 @@
 
 <Weekday> ::= `Monday' | `Tuesday' | `Friday' | `Thursday' | `Saturday' | `Sunday'
 
-<Month> ::= `January' | `February' | `March' | `April' | `May' | `June' | `July' | `August' | `September' | `October' | `November' | `December'
-
 <Adjective> ::= `angry' | `funny' | `happy' | `evil' | `sad' | `shy'
 
 <Person> ::= `girl' | `boy' | `man' | `woman' | `sister' | `brother' | `uncle' | `aunt' | <Adjective> <Person>

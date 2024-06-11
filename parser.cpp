@@ -380,7 +380,7 @@ std::ostream &operator<<(std::ostream &out, const Grammar &gram) {
             names.insert(gram.terms.get(s));
             }
         }
-        out << "FIRST(" << gram.non_terms.get(nonterminal) << ") = " << names << "\n";
+        out << "FIRST(<" << gram.non_terms.get(nonterminal) << ">) = " << names << "\n";
     }
     out << "\n"
         << "Follows list: \n";
@@ -393,7 +393,7 @@ std::ostream &operator<<(std::ostream &out, const Grammar &gram) {
                 names.insert(gram.terms.get(s));
             }
         }
-        out << "FOLLOW(" << gram.non_terms.get(nonterminal) << ") = " << names << "\n";
+        out << "FOLLOW(<" << gram.non_terms.get(nonterminal) << ">) = " << names << "\n";
     }
     out << "\n"
         << "Parsing Table: \n"
@@ -592,7 +592,7 @@ int main(int argc, char const *argv[]) {
     }
     auto [a, b] = parse_file(grammar_file);
     Grammar gram{a,b.first, b.second};
-    cout << "Grammar parsed: \n" << gram << "\n";
+//    cout << "Grammar parsed: \n" << gram << "\n";
 
 //    std::ifstream rights{"right-strings.txt"};
 //    while (rights) {
