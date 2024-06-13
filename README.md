@@ -37,7 +37,7 @@ Grammar parsed:
 3. A → [baA]
 4. B → {bT}
 5. B → {aBB}
-6. T → <ϵ>
+6. T → <ε>
 7. T → <S>
 
 The non-terminals in the grammar are: {A, B, S, T}

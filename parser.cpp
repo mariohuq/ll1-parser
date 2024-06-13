@@ -84,7 +84,7 @@ private:
                 }
 
                 const auto& ch_firsts = firsts.at(*ch);
-                // If char's FIRSTs don't have ϵ FOLLOW search is over
+                // If char's FIRSTs don't have ε FOLLOW search is over
                 if (ch_firsts.find(EPSILON) == ch_firsts.end()) {
                     the_follows[x].insert(ch_firsts.begin(), ch_firsts.end());
                     finished = true;
@@ -115,7 +115,7 @@ private:
                 continue;
             }
             // cout<<"Processing production "<<lhs<<"->"<<rhs<<"\n";
-            // Loop till a non-terminal or no ϵ found
+            // Loop till a non-terminal or no ε found
             for (auto ch = rhs.begin(); ch != rhs.end(); ++ch) {
                 if (is_semantic(*ch)) {
                     continue;
@@ -131,13 +131,13 @@ private:
                 if (ch_firsts.empty()) {
                         find_first(the_firsts, *ch);
                 }
-                // If variable doesn't have ϵ, go to next production
+                // If variable doesn't have ε, go to next production
                 if (ch_firsts.find(EPSILON) == ch_firsts.end()) {
                     the_firsts[x].insert(ch_firsts.begin(), ch_firsts.end());
                     break;
                 }
                 auto ch_firsts_copy = ch_firsts;
-                // Remove ϵ from FIRST if not the last variable
+                // Remove ε from FIRST if not the last variable
                 if (!is_last(ch, rhs.end())) {
                     ch_firsts_copy.erase(EPSILON);
                 }
@@ -194,7 +194,7 @@ private:
                 }
             }
         }
-        // Remove ϵ and add end character $
+        // Remove ε and add end character $
         result.erase(EPSILON);
         result.insert(END_OF_INPUT);
         return result;
@@ -228,7 +228,7 @@ private:
                 firsts_copy.erase(EPSILON);
                 next_list.insert(firsts_copy.begin(), firsts_copy.end());
             }
-            // If the whole rhs can be skipped through ϵ or reaching the end
+            // If the whole rhs can be skipped through ε or reaching the end
             // Add FOLLOW to NEXT list
             if (!finished) {
                 const auto &my_follows = follows.at(lhs);
@@ -286,7 +286,7 @@ std::ostream &operator<<(std::ostream &os, const std::set<T> &s) {
 
 std::ostream &operator<<(std::ostream &out, const Grammar &gram) {
     for (int count = 0; const auto &[lhs, rhs]: gram.productions) {
-        out << count++ << ". " << lhs << " → " << (rhs[1] == EPSILON ? (std::string{ rhs[0] } + "ϵ" + rhs[2]) : rhs) << "\n";
+        out << count++ << ". " << lhs << " → " << (rhs[1] == EPSILON ? (std::string{ rhs[0] } + "ε" + rhs[2]) : rhs) << "\n";
     }
     out << "\n"
         << "The non-terminals in the grammar are: " << gram.non_terms << "\n"
